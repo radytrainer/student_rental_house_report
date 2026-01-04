@@ -128,6 +128,9 @@
 <script setup>
 import { ref } from 'vue'
 import { sendReport } from './services/reportService'
+import { useToast } from 'vue-toast-notification'
+const toast = useToast()
+
 
 const anonymous = ref(true)
 const name = ref('')
@@ -162,11 +165,11 @@ const submitForm = async () => {
     issue.value = ''
     support.value = ''
 
-    alert("Report submitted successfully!")
+    toast.success('Report submitted successfully')
 
   } catch (err) {
     console.error("Unexpected error:", err)
-    alert("An unexpected error occurred. Please try again.")
+    toast.error('Failed to submit report. Please try again.')
   } finally {
     loading.value = false
   }
