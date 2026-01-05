@@ -7,7 +7,7 @@
         <img src="/pn-logo.png" class="h-10 w-10 object-contain" />
         <div>
           <h2 class="text-lg font-semibold text-gray-800">
-            Rental House Issue Report
+            General Issue Report
           </h2>
           <p class="text-xs text-gray-500">
             All reports are confidential
@@ -18,7 +18,7 @@
       <!-- FORM -->
       <form @submit.prevent="submitForm" class="px-5 py-4 space-y-4">
 
-        <!-- REPORT TYPE -->
+        <!-- REPORT AS -->
         <div>
           <label class="text-sm font-medium text-gray-700">
             Report As
@@ -49,7 +49,23 @@
           />
         </div>
 
-        <!-- DATE + TIME -->
+        <!-- REPORT CATEGORY -->
+        <div>
+          <label class="text-sm font-medium text-gray-700">
+            Report Category
+          </label>
+          <select
+            v-model="reportCategory"
+            class="form-input"
+            required
+          >
+            <option value="" disabled>Select category</option>
+            <option value="rental">Rental House</option>
+            <option value="school">School</option>
+          </select>
+        </div>
+
+        <!-- DATE & TIME -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="text-sm font-medium text-gray-700">
@@ -70,18 +86,27 @@
           <label class="text-sm font-medium text-gray-700">
             Location
           </label>
-          <select v-model="location" class="form-input" required>
-            <option value="" disabled>Select location</option>
-            <option>Room</option>
-            <option>Kitchen</option>
-            <option>Bathroom</option>
-            <option>Parking Area</option>
-            <option>Outside House</option>
-            <option>Other</option>
+          <select
+            v-model="location"
+            class="form-input"
+            :disabled="!reportCategory"
+            required
+          >
+            <option value="" disabled>
+              {{ reportCategory ? 'Select location' : 'Select category first' }}
+            </option>
+
+            <option
+              v-for="loc in locationOptions"
+              :key="loc"
+              :value="loc"
+            >
+              {{ loc }}
+            </option>
           </select>
         </div>
 
-        <!-- ISSUE -->
+        <!-- ISSUE DESCRIPTION -->
         <div>
           <label class="text-sm font-medium text-gray-700">
             Issue Description
@@ -95,7 +120,7 @@
           ></textarea>
         </div>
 
-        <!-- SUPPORT -->
+        <!-- SUPPORT NEEDED -->
         <div>
           <label class="text-sm font-medium text-gray-700">
             Support Needed
@@ -104,7 +129,7 @@
             v-model="support"
             rows="2"
             class="form-input resize-none"
-            placeholder="Support required"
+            placeholder="What support is required?"
             required
           ></textarea>
         </div>
@@ -126,14 +151,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { sendReport } from './services/reportService'
 import { useToast } from 'vue-toast-notification'
+
 const toast = useToast()
 
-
+/* STATE */
 const anonymous = ref(true)
 const name = ref('')
+const reportCategory = ref('')
 const issueDate = ref('')
 const issueTime = ref('')
 const location = ref('')
@@ -141,13 +168,48 @@ const issue = ref('')
 const support = ref('')
 const loading = ref(false)
 
+/* LOCATION OPTIONS */
+const locationOptions = computed(() => {
+  if (reportCategory.value === 'rental') {
+    return [
+      'Room',
+      'Kitchen',
+      'Bathroom',
+      'Outside House',
+      'Other'
+    ]
+  }
+
+  if (reportCategory.value === 'school') {
+    return [
+      'Classroom',
+      'Meeting Room',
+      'Library',
+      'Teacher Office',
+      'Playground',
+      'Parking Area',
+      'Other'
+    ]
+  }
+
+  return []
+})
+
+/* RESET LOCATION WHEN CATEGORY CHANGES */
+watch(reportCategory, () => {
+  location.value = ''
+})
+
+/* SUBMIT */
 const submitForm = async () => {
   loading.value = true
 
   try {
     const formData = new FormData()
+
     formData.append('anonymous', anonymous.value ? 'Yes' : 'No')
     formData.append('name', anonymous.value ? 'Anonymous' : name.value)
+    formData.append('report_category', reportCategory.value)
     formData.append('issue_date', issueDate.value)
     formData.append('issue_time', issueTime.value)
     formData.append('location', location.value)
@@ -156,9 +218,10 @@ const submitForm = async () => {
 
     await sendReport(formData)
 
-    // ✅ ALWAYS SUCCESS if no error thrown
+    /* RESET FORM */
     anonymous.value = true
     name.value = ''
+    reportCategory.value = ''
     issueDate.value = ''
     issueTime.value = ''
     location.value = ''
@@ -167,14 +230,11 @@ const submitForm = async () => {
 
     toast.success('Report submitted successfully')
 
-  } catch (err) {
-    console.error("Unexpected error:", err)
+  } catch (error) {
+    console.error(error)
     toast.error('Failed to submit report. Please try again.')
   } finally {
     loading.value = false
   }
 }
-
-
-
 </script>
