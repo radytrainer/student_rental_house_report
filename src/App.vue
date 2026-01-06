@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-slate-100 flex items-start justify-center px-3 py-6">
+  <div class="min-h-screen bg-slate-100 flex justify-center px-3 py-6">
     <div class="w-full max-w-2xl bg-white rounded-lg shadow-sm border">
 
       <!-- HEADER -->
@@ -45,24 +45,25 @@
             type="text"
             class="form-input"
             placeholder="Full name"
-            required
           />
+          <p v-if="errors.name" class="error-text">
+            {{ errors.name }}
+          </p>
         </div>
 
-        <!-- REPORT CATEGORY -->
+        <!-- CATEGORY -->
         <div>
           <label class="text-sm font-medium text-gray-700">
             Report Category
           </label>
-          <select
-            v-model="reportCategory"
-            class="form-input"
-            required
-          >
+          <select v-model="reportCategory" class="form-input">
             <option value="" disabled>Select category</option>
             <option value="rental">Rental House</option>
             <option value="school">School</option>
           </select>
+          <p v-if="errors.reportCategory" class="error-text">
+            {{ errors.reportCategory }}
+          </p>
         </div>
 
         <!-- DATE & TIME -->
@@ -71,13 +72,20 @@
             <label class="text-sm font-medium text-gray-700">
               Issue Date
             </label>
-            <input type="date" v-model="issueDate" class="form-input" required />
+            <input type="date" v-model="issueDate" class="form-input" />
+            <p v-if="errors.issueDate" class="error-text">
+              {{ errors.issueDate }}
+            </p>
           </div>
+
           <div>
             <label class="text-sm font-medium text-gray-700">
               Issue Time
             </label>
-            <input type="time" v-model="issueTime" class="form-input" required />
+            <input type="time" v-model="issueTime" class="form-input" />
+            <p v-if="errors.issueTime" class="error-text">
+              {{ errors.issueTime }}
+            </p>
           </div>
         </div>
 
@@ -90,23 +98,20 @@
             v-model="location"
             class="form-input"
             :disabled="!reportCategory"
-            required
           >
             <option value="" disabled>
               {{ reportCategory ? 'Select location' : 'Select category first' }}
             </option>
-
-            <option
-              v-for="loc in locationOptions"
-              :key="loc"
-              :value="loc"
-            >
+            <option v-for="loc in locationOptions" :key="loc" :value="loc">
               {{ loc }}
             </option>
           </select>
+          <p v-if="errors.location" class="error-text">
+            {{ errors.location }}
+          </p>
         </div>
 
-        <!-- ISSUE DESCRIPTION -->
+        <!-- ISSUE -->
         <div>
           <label class="text-sm font-medium text-gray-700">
             Issue Description
@@ -115,12 +120,14 @@
             v-model="issue"
             rows="3"
             class="form-input resize-none"
-            placeholder="Briefly describe the issue"
-            required
+            placeholder="Describe the issue"
           ></textarea>
+          <p v-if="errors.issue" class="error-text">
+            {{ errors.issue }}
+          </p>
         </div>
 
-        <!-- SUPPORT NEEDED -->
+        <!-- SUPPORT -->
         <div>
           <label class="text-sm font-medium text-gray-700">
             Support Needed
@@ -130,8 +137,10 @@
             rows="2"
             class="form-input resize-none"
             placeholder="What support is required?"
-            required
           ></textarea>
+          <p v-if="errors.support" class="error-text">
+            {{ errors.support }}
+          </p>
         </div>
 
         <!-- SUBMIT -->
@@ -167,19 +176,13 @@ const location = ref('')
 const issue = ref('')
 const support = ref('')
 const loading = ref(false)
+const errors = ref({})
 
 /* LOCATION OPTIONS */
 const locationOptions = computed(() => {
   if (reportCategory.value === 'rental') {
-    return [
-      'Room',
-      'Kitchen',
-      'Bathroom',
-      'Outside House',
-      'Other'
-    ]
+    return ['Room', 'Kitchen', 'Bathroom', 'Outside House', 'Other']
   }
-
   if (reportCategory.value === 'school') {
     return [
       'Classroom',
@@ -191,22 +194,54 @@ const locationOptions = computed(() => {
       'Other'
     ]
   }
-
   return []
 })
 
-/* RESET LOCATION WHEN CATEGORY CHANGES */
 watch(reportCategory, () => {
   location.value = ''
 })
 
+/* VALIDATION */
+const validateForm = () => {
+  const e = {}
+
+  if (!anonymous.value && !name.value.trim()) {
+    e.name = 'Name is required'
+  }
+  if (!reportCategory.value) {
+    e.reportCategory = 'Category is required'
+  }
+  if (!issueDate.value) {
+    e.issueDate = 'Date is required'
+  }
+  if (!issueTime.value) {
+    e.issueTime = 'Time is required'
+  }
+  if (!location.value) {
+    e.location = 'Location is required'
+  }
+  if (!issue.value || issue.value.length < 10) {
+    e.issue = 'Minimum 10 characters required'
+  }
+  if (!support.value || support.value.length < 5) {
+    e.support = 'Minimum 5 characters required'
+  }
+
+  errors.value = e
+  return Object.keys(e).length === 0
+}
+
 /* SUBMIT */
 const submitForm = async () => {
+  if (!validateForm()) {
+    toast.error('Please fix the highlighted errors')
+    return
+  }
+
   loading.value = true
 
   try {
     const formData = new FormData()
-
     formData.append('anonymous', anonymous.value ? 'Yes' : 'No')
     formData.append('name', anonymous.value ? 'Anonymous' : name.value)
     formData.append('report_category', reportCategory.value)
@@ -218,7 +253,10 @@ const submitForm = async () => {
 
     await sendReport(formData)
 
-    /* RESET FORM */
+    Object.assign(
+      { value: anonymous }, { value: true }
+    )
+
     anonymous.value = true
     name.value = ''
     reportCategory.value = ''
@@ -227,14 +265,25 @@ const submitForm = async () => {
     location.value = ''
     issue.value = ''
     support.value = ''
+    errors.value = {}
 
     toast.success('Report submitted successfully')
-
-  } catch (error) {
-    console.error(error)
-    toast.error('Failed to submit report. Please try again.')
+  } catch (err) {
+    console.error(err)
+    toast.error('Submission failed. Try again.')
   } finally {
     loading.value = false
   }
 }
 </script>
+
+<style>
+.form-input {
+  @apply w-full border border-gray-300 rounded-md px-3 py-2
+         text-sm focus:outline-none focus:ring-2 focus:ring-blue-500;
+}
+
+.error-text {
+  @apply text-xs text-red-600 mt-1;
+}
+</style>
